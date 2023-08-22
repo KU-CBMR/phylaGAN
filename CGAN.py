@@ -3,25 +3,25 @@ require 'models.base_model'
 require 'models.architectures'
 require 'util.image_pool'
 util = paths.dofile('../util/util.lua')
-content = paths.dofile('../util/content_loss.lua')
+conditional = paths.dofile('../util/conditional_loss.lua')
 
-ContentGANModel = class('ContentGANModel', 'BaseModel')
+ConditionalGANModel = class('ConditionalGANModel', 'BaseModel')
 
-function ContentGANModel:__init(conf)
+function ConditionalGANModel:__init(conf)
   BaseModel.__init(self, conf)
   conf = conf or {}
 end
 
-function ContentGANModel:model_name()
-  return 'ContentGANModel'
+function ConditionalGANModel:model_name()
+  return 'ConditionalGANModel'
 end
 
-function ContentGANModel:InitializeStates()
+function ConditionalGANModel:InitializeStates()
   local optimState = {learningRate=opt.lr, beta1=opt.beta1,}
   return optimState
 end
 -- Defines models and networks
-function ContentGANModel:Initialize(opt)
+function ConditionalGANModel:Initialize(opt)
   if opt.test == 0 then
     self.fakePool = ImagePool(opt.pool_size)
   end
@@ -32,8 +32,8 @@ function ContentGANModel:Initialize(opt)
 
   -- load/define models
   self.criterionGAN = nn.MSECriterion()
-  self.criterionContent = nn.AbsCriterion()
-  self.contentFunc = content.defineContent(opt.content_loss, opt.layer_name)
+  self.criterionConditional = nn.AbsCriterion()
+  self.conditionalFunc = conditional.defineConditional(opt.conditional_loss, opt.layer_name)
   self.netG, self.netD = nil, nil
   if opt.continue_train == 1 then
     if opt.which_epoch then -- which_epoch option exists in test mode
@@ -65,7 +65,7 @@ end
 
 -- Runs the forward pass of the network and
 -- saves the result to member variables of the class
-function ContentGANModel:Forward(input, opt)
+function ConditionalGANModel:Forward(input, opt)
   if opt.which_direction == 'BtoA' then
     local temp = input.real_A
     input.real_A = input.real_B
@@ -84,7 +84,7 @@ function ContentGANModel:Forward(input, opt)
 end
 
 -- create closure to evaluate f(X) and df/dX of discriminator
-function ContentGANModel:fDx_basic(x, gradParams, netD, netG,
+function ConditionalGANModel:fDx_basic(x, gradParams, netD, netG,
                                    real_target, fake_target, opt)
   util.BiasZero(netD)
   util.BiasZero(netG)
@@ -108,14 +108,14 @@ function ContentGANModel:fDx_basic(x, gradParams, netD, netG,
 end
 
 
-function ContentGANModel:fDx(x, opt)
+function ConditionalGANModel:fDx(x, opt)
   fake_B = self.fakePool:Query(self.fake_B)
   self.errD, gradParams = self:fDx_basic(x, self.gradparametersD, self.netD, self.netG,
                                      self.real_B, fake_B, opt)
   return self.errD, gradParams
 end
 
-function ContentGANModel:fGx_basic(x, netG_source, netD_source, real_source, real_target, fake_target,
+function ConditionalGANModel:fGx_basic(x, netG_source, netD_source, real_source, real_target, fake_target,
                                    gradParametersG_source, opt)
   util.BiasZero(netD_source)
   util.BiasZero(netG_source)
@@ -130,17 +130,17 @@ function ContentGANModel:fGx_basic(x, netG_source, netD_source, real_source, rea
   local df_do = self.criterionGAN:backward(output, self.real_label)
   local df_d_GAN = netD_source:updateGradInput(fake_target, df_do) ---:narrow(2,fake_AB:size(2)-output_nc+1, output_nc)
 
-  -- content loss
-  -- print('content_loss', opt.content_loss)
-  -- function content.lossUpdate(criterionContent, real_source, fake_target, contentFunc, loss_type, weight)
-  local errContent, df_d_content = content.lossUpdate(self.criterionContent, real_source, fake_target, self.contentFunc, opt.content_loss, opt.lambda_A)
+  -- conditional loss
+  -- print('conditional_loss', opt.conditional_loss)
+  -- function conditional.lossUpdate(criterionConditional, real_source, fake_target, conditionalFunc, loss_type, weight)
+  local errConditional, df_d_conditional = conditional.lossUpdate(self.criterionConditional, real_source, fake_target, self.conditionalFunc, opt.conditional_loss, opt.lambda_A)
   netG_source:forward(real_source)
-  netG_source:backward(real_source, df_d_GAN  + df_d_content)
+  netG_source:backward(real_source, df_d_GAN  + df_d_conditional)
   -- print('errD', errGAN)
-  return gradParametersG_source, errGAN, errContent
+  return gradParametersG_source, errGAN, errConditional
 end
 
-function ContentGANModel:fGx(x, opt)
+function ConditionalGANModel:fGx(x, opt)
   self.gradparametersG, self.errG, self.errCont =
   self:fGx_basic(x, self.netG, self.netD,
              self.real_A, self.real_B, self.fake_B,
@@ -148,14 +148,14 @@ function ContentGANModel:fGx(x, opt)
   return self.errG, self.gradparametersG
 end
 
-function ContentGANModel:OptimizeParameters(opt)
+function ConditionalGANModel:OptimizeParameters(opt)
   local fDx = function(x) return self:fDx(x, opt) end
   local fGx = function(x) return self:fGx(x, opt) end
   optim.adam(fDx, self.parametersD, self.optimStateD)
   optim.adam(fGx, self.parametersG, self.optimStateG)
 end
 
-function ContentGANModel:RefreshParameters()
+function ConditionalGANModel:RefreshParameters()
   self.parametersD, self.gradparametersD = nil, nil -- nil them to avoid spiking memory
   self.parametersG, self.gradparametersG = nil, nil
   -- define parameters of optimization
@@ -163,32 +163,32 @@ function ContentGANModel:RefreshParameters()
   self.parametersD, self.gradparametersD = self.netD:getParameters()
 end
 
-function ContentGANModel:Save(prefix, opt)
+function ConditionalGANModel:Save(prefix, opt)
   util.save_model(self.netG, prefix .. '_net_G_A.t7', 1.0)
   util.save_model(self.netD, prefix .. '_net_D_A.t7', 1.0)
 end
 
-function ContentGANModel:GetCurrentErrorDescription()
-  description = ('G: %.4f  D: %.4f  Content: %.4f'):format(self.errG and self.errG or -1,
+function ConditionalGANModel:GetCurrentErrorDescription()
+  description = ('G: %.4f  D: %.4f  Conditional: %.4f'):format(self.errG and self.errG or -1,
                          self.errD and self.errD or -1,
                          self.errCont and self.errCont or -1)
   return description
 end
 
 
-function ContentGANModel:GetCurrentErrors()
+function ConditionalGANModel:GetCurrentErrors()
   local errors = {errG=self.errG and self.errG or -1, errD=self.errD and self.errD or -1,
   errCont=self.errCont and self.errCont or -1}
   return errors
 end
 
 -- returns a string that describes the display plot configuration
-function ContentGANModel:DisplayPlot(opt)
+function ConditionalGANModel:DisplayPlot(opt)
   return 'errG,errD,errCont'
 end
 
 
-function ContentGANModel:GetCurrentVisuals(opt, size)
+function ConditionalGANModel:GetCurrentVisuals(opt, size)
   if not size then
     size = opt.display_winsize
   end
