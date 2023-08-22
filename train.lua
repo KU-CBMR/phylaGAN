@@ -5,7 +5,7 @@ require 'torch'
 require 'nn'
 require 'optim'
 util = paths.dofile('util/util.lua')
-content = paths.dofile('util/content_loss.lua')
+content = paths.dofile('util/conditional_loss.lua')
 require 'image'
 require 'models.architectures'
 
