@@ -10,7 +10,7 @@ start_time = time.time()
 
 def conv_layer(input_feat,conv_feature,x_shape,conv2d_stride,
   maxpool_ksize,maxpool_stride,in_ch):
-  """ Convolutional layer """
+  
   W_conv1 = weight_variable([1, input_feat, in_ch, conv_feature])
   b_conv1 = bias_variable([conv_feature])
   h_conv1 = tf.nn.relu(conv2d(x_shape, W_conv1,conv2d_stride) + b_conv1)
