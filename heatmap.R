@@ -1,3 +1,4 @@
+#heatmap
 data <- read.csv("phyla.csv", header = TRUE, stringsAsFactors = FALSE,sep=",")
 
 
