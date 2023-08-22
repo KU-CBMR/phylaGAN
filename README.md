@@ -1,11 +1,6 @@
-# phyLoSTM
+# phylaGAN
 
-A combined modeling using CNN for feature extraction and LSTM for temporal dependency analysis in microbiome data.
-DIABIMMUNE three country cohort and DiGuilio study have been used as the data for implementation of the method.
-
-temporal.py is the file for longitudinal analysis and CNN.py is the file for CNN based feature extraction 
-
-The datafiles are OTU_data_revised.csv and Diguilio.xlsx
+Two-step generative pipeline using a combination of C-GAN model and autoencoders that can sample microbiome data from different conditions and provide synthetic data representative of the true data and project it onto a common subspace for disease prediction.
 
 Prerequisites:
 
