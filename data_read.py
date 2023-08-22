@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import math
 
-
+#load data
 def load():
     ## Input file specific variables
   otuinfile = '/Analysis_OTU/ANalysis_ROC/Code/github/Sim/Sim_OTU.csv'
