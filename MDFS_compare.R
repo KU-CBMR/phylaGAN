@@ -1,4 +1,4 @@
-#' Max information gains
+#' 
 #'
 #' @param acceleration.type acceleration type
 #'   ('scalar' for none, 'avx'/'avx2' for use of the AVX/AVX2 instruction set respectively, 'cuda' for CUDA)
