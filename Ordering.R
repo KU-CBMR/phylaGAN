@@ -4,7 +4,6 @@ OTU_data_sim<-read.csv('OTU_orig.csv',header = TRUE, stringsAsFactors = FALSE,se
 
 
 
-
 OTU_data_firmicutes=data.matrix(data[62:129,3:346], rownames.force = NA)
 
 
